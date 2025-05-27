@@ -1,0 +1,18 @@
+# Ignorar entorno virtual
+venv/
+
+# Archivos de configuración de Python
+__pycache__/
+*.py[cod]
+
+# Archivos de Jupyter
+.ipynb_checkpoints/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Archivos temporales
+*.log
+*.tmp
+*.bak
