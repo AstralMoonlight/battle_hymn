@@ -1,7 +1,27 @@
 # utils/estrategia.py
-import winsound
+import os
+from pygame import mixer
+from config import SYMBOL  # si deseas usarlo en los prints
+
+# Inicializa el reproductor una vez
+mixer.init()
 
 diferencia_di = 1
+
+# Rutas de sonido
+SONIDO_LONG = os.path.join("wav", "sound2.wav")
+SONIDO_SHORT = os.path.join("wav", "sound3.wav")
+
+def reproducir_sonido(ruta):
+    try:
+        if os.path.exists(ruta):
+            mixer.music.load(ruta)
+            mixer.music.play()
+        else:
+            print(f"⚠️ Archivo de sonido no encontrado: {ruta}")
+    except Exception as e:
+        print(f"⚠️ Error al reproducir sonido: {e}")
+
 def evaluar_senal(df, solo_tipo=False):
     fila = df.iloc[-1]
 
@@ -37,16 +57,15 @@ def evaluar_senal(df, solo_tipo=False):
             return "short"
         else:
             return None
-
+        
     if long_cond:
         extra = " (✅ Mejorado por precio < centro Bollinger)" if close < bb_centro else ""
-        winsound.Beep(1500, 750)  # frecuencia 1000Hz, duración 500ms
         print(f"🟢 Señal LONG recomendada{extra}")
-        
+        reproducir_sonido(SONIDO_LONG)
+
     elif short_cond:
         extra = " (✅ Mejorado por precio > centro Bollinger)" if close > bb_centro else ""
-        winsound.Beep(1000, 500)  # frecuencia 1000Hz, duración 500ms
-
         print(f"🔴 Señal SHORT recomendada{extra}")
+        reproducir_sonido(SONIDO_SHORT)
     else:
         print("⚪ Sin señal clara, esperar confirmación.")
