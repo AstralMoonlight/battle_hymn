@@ -69,9 +69,37 @@ def actualizar_datos():
         ultimo = df_local.index[-1]
         df_nuevo = df_nuevo[df_nuevo.index > ultimo]
         if df_nuevo.empty:
-            print("ℹ️ No hay nuevas velas para agregar.")
+            #print("ℹ️ No hay nuevas velas para agregar.")
             return df_local
         df = pd.concat([df_local, df_nuevo])
 
     guardar_datos_locales(df)
     return df
+
+
+def obtener_vela_en_formacion():
+    url = "https://fapi.binance.com/fapi/v1/klines"
+    params = {"symbol": SYMBOL, "interval": BASE_INTERVAL_STR, "limit": 2}
+    response = requests.get(url, params=params)
+
+    try:
+        data = response.json()
+        if not data or (isinstance(data, dict) and data.get("code")):
+            print(f"⚠️ Error al obtener datos en tiempo real: {data}")
+            return None
+    except Exception as e:
+        print(f"❌ Error al parsear JSON en tiempo real: {e}")
+        return None
+
+    vela_actual = data[-1]
+    columnas = [
+        "timestamp", "Open", "High", "Low", "Close", "Volume",
+        "Close_time", "Quote_asset_volume", "Number_of_trades",
+        "Taker_buy_base", "Taker_buy_quote", "Ignore"
+    ]
+    df = pd.DataFrame([vela_actual], columns=columnas)
+    df = df.astype({"Open": float, "High": float, "Low": float, "Close": float, "Volume": float})
+    df["timestamp"] = pd.to_datetime(df["timestamp"], unit='ms')
+    df["timestamp"] = df["timestamp"].dt.tz_localize("UTC").dt.tz_convert(tz_local)
+    df.set_index("timestamp", inplace=True)
+    return df.iloc[0]

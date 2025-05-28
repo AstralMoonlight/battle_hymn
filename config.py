@@ -1,7 +1,8 @@
 # config.py
-from binance.client import Client
+from binance.client import Client # type: ignore
 
 SYMBOL = "BTCUSDT"
+#SYMBOL = "ETHUSDT"
 BASE_INTERVAL = Client.KLINE_INTERVAL_1MINUTE
 BASE_INTERVAL_STR = "1m"
 ANALYSIS_INTERVAL = "1min"
@@ -10,6 +11,7 @@ SL=-3
 LIMIT = 1000
 SALDO_INICIAL = 200
 APALANCAMIENTO = 15
-DIAS_TEST= 60
+DIAS_TEST= 1
 CSV_FILE = f"data/{SYMBOL}_{BASE_INTERVAL_STR}.csv"
 TIMEZONE = "Etc/GMT+4"
+CONFIRMACION_AVISO = 4

@@ -1,4 +1,6 @@
 # utils/estrategia.py
+import winsound
+
 diferencia_di = 1
 def evaluar_senal(df, solo_tipo=False):
     fila = df.iloc[-1]
@@ -38,9 +40,13 @@ def evaluar_senal(df, solo_tipo=False):
 
     if long_cond:
         extra = " (✅ Mejorado por precio < centro Bollinger)" if close < bb_centro else ""
+        winsound.Beep(1500, 750)  # frecuencia 1000Hz, duración 500ms
         print(f"🟢 Señal LONG recomendada{extra}")
+        
     elif short_cond:
         extra = " (✅ Mejorado por precio > centro Bollinger)" if close > bb_centro else ""
+        winsound.Beep(1000, 500)  # frecuencia 1000Hz, duración 500ms
+
         print(f"🔴 Señal SHORT recomendada{extra}")
     else:
         print("⚪ Sin señal clara, esperar confirmación.")
