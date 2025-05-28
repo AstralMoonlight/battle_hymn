@@ -11,10 +11,21 @@ def es_hammer(vela):
     mecha_inferior = min(vela["Close"], vela["Open"]) - vela["Low"]
     return mecha_inferior > cuerpo * 2 and vela["Close"] > vela["Open"]
 
+def es_hanging_man(vela):
+    cuerpo = abs(vela["Close"] - vela["Open"])
+    mecha_inferior = min(vela["Close"], vela["Open"]) - vela["Low"]
+    return mecha_inferior > cuerpo * 2 and vela["Close"] < vela["Open"]
+
 def es_inverted_hammer(vela):
     cuerpo = abs(vela["Close"] - vela["Open"])
     mecha_superior = vela["High"] - max(vela["Close"], vela["Open"])
     return mecha_superior > cuerpo * 2 and vela["Close"] < vela["Open"]
+
+def es_shooting_star(vela):
+    cuerpo = abs(vela["Close"] - vela["Open"])
+    mecha_superior = vela["High"] - max(vela["Close"], vela["Open"])
+    return mecha_superior > cuerpo * 2 and vela["Close"] < vela["Open"]
+
 
 def es_harami_alcista(vela_anterior, vela):
     return (

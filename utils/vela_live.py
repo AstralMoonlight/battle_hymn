@@ -11,26 +11,10 @@ from datetime import datetime
 from config import SYMBOL, BASE_INTERVAL_STR, TIMEZONE
 import pytz
 from utils.patrones_velas import *
+from utils.patrones import determinar_patron_dominante
 from utils.binance_data import obtener_vela_en_formacion, actualizar_datos
 
 tz_local = pytz.timezone(TIMEZONE)
-
-def determinar_patron_dominante(vela_anterior, vela):
-    if es_estrella_amanecer(vela_anterior, vela):
-        return "🌅 Estrella del amanecer"
-    elif es_estrella_atardecer(vela_anterior, vela):
-        return "🌇 Estrella del atardecer"
-    elif es_harami_alcista(vela_anterior, vela):
-        return "🟢 Harami alcista"
-    elif es_harami_bajista(vela_anterior, vela):
-        return "🔻 Harami bajista"
-    elif es_hammer(vela):
-        return "🔨 Hammer"
-    elif es_inverted_hammer(vela):
-        return "🪓 Inverted Hammer"
-    elif es_doji(vela):
-        return ("⚠️" + "Doji")
-    return None
 
 if __name__ == "__main__":
     while True:
@@ -45,15 +29,17 @@ if __name__ == "__main__":
 
         if vela is not None and not vela.empty and vela_anterior is not None:
             patron = determinar_patron_dominante(vela_anterior, vela)
-            if patron:
-                print(f"⏱️   {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} — Analizando vela cerrada + en formación | Posible: {patron}")
-            else:
-                print(f"⏱️   {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} — Analizando vela cerrada + en formación...")
-            print(f"📍 Vela en formación: Open={vela['Open']} | High={vela['High']} | Low={vela['Low']} | Close={vela['Close']} | Volume={vela['Volume']}")
-            print("-" * 80)
-            print("\n")
+            
+            linea1 = f"⏱️   {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} — Analizando vela cerrada + en formación"
+            linea1 += f" | Posible: {patron}" if patron else "..."
+            linea2 = f"📍 Vela en formación: Open={vela['Open']} | High={vela['High']} | Low={vela['Low']} | Close={vela['Close']} | Volume={vela['Volume']}"
+
+            # Mueve cursor 2 líneas arriba, borra, luego imprime ambas líneas
+            sys.stdout.write("\033[F\033[K" * 2)  # ANSI: cursor arriba y borra línea (x2)
+            print(linea1)
+            print(linea2)
 
 
 
 
-        time.sleep(5)
+        time.sleep(1)
