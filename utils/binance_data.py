@@ -103,3 +103,8 @@ def obtener_vela_en_formacion():
     df["timestamp"] = df["timestamp"].dt.tz_localize("UTC").dt.tz_convert(tz_local)
     df.set_index("timestamp", inplace=True)
     return df.iloc[0]
+
+def set_symbol(new_symbol):
+    global SYMBOL, CSV_FILE
+    SYMBOL = new_symbol.upper()
+    CSV_FILE = f"data/{SYMBOL}_{BASE_INTERVAL_STR}.csv"

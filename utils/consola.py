@@ -1,13 +1,15 @@
 # utils/consola.py
-from config import SYMBOL, ANALYSIS_INTERVAL
+import config  # ⬅️ Así accedemos a SYMBOL actualizado
+from config import ANALYSIS_INTERVAL
 
-def mostrar_ultimo(df):
+
+def mostrar_ultimo(df,symbol):
     if df.empty:
         print("⚠️ DataFrame vacío. No hay datos para mostrar.")
         return
 
     ultima = df.iloc[-1]
-    print(f"\n📍 {ultima.name} — {SYMBOL} ({ANALYSIS_INTERVAL})")
+    print(f"\n📍 {ultima.name} — {symbol} ({ANALYSIS_INTERVAL}))")
     print(f"RSI        : {ultima['RSI']:.2f}")
     print(f"+DI / -DI  : {ultima['+DI']:.2f} / {ultima['-DI']:.2f}")
     print(f"ADX        : {ultima['ADX']:.2f}")
