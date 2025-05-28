@@ -35,7 +35,7 @@ def esperar_nueva_vela(ultimo_timestamp):
         print(linea1)
         print(linea2)
         primera_iteracion = False
-        time.sleep(1)
+        time.sleep(5)
 
 
 if __name__ == "__main__":

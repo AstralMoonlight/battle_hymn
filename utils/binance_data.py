@@ -78,31 +78,42 @@ def actualizar_datos():
 
 
 def obtener_vela_en_formacion():
+    import time
+
     url = "https://fapi.binance.com/fapi/v1/klines"
     params = {"symbol": SYMBOL, "interval": BASE_INTERVAL_STR, "limit": 2}
-    response = requests.get(url, params=params)
 
-    try:
-        data = response.json()
-        if not data or (isinstance(data, dict) and data.get("code")):
-            print(f"⚠️ Error al obtener datos en tiempo real: {data}")
-            return None
-    except Exception as e:
-        print(f"❌ Error al parsear JSON en tiempo real: {e}")
-        return None
+    max_reintentos = 5
+    for intento in range(max_reintentos):
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
 
-    vela_actual = data[-1]
-    columnas = [
-        "timestamp", "Open", "High", "Low", "Close", "Volume",
-        "Close_time", "Quote_asset_volume", "Number_of_trades",
-        "Taker_buy_base", "Taker_buy_quote", "Ignore"
-    ]
-    df = pd.DataFrame([vela_actual], columns=columnas)
-    df = df.astype({"Open": float, "High": float, "Low": float, "Close": float, "Volume": float})
-    df["timestamp"] = pd.to_datetime(df["timestamp"], unit='ms')
-    df["timestamp"] = df["timestamp"].dt.tz_localize("UTC").dt.tz_convert(tz_local)
-    df.set_index("timestamp", inplace=True)
-    return df.iloc[0]
+            if not data or (isinstance(data, dict) and data.get("code")):
+                print(f"⚠️ Error al obtener datos en tiempo real: {data}")
+                return None
+
+            vela_actual = data[-1]
+            columnas = [
+                "timestamp", "Open", "High", "Low", "Close", "Volume",
+                "Close_time", "Quote_asset_volume", "Number_of_trades",
+                "Taker_buy_base", "Taker_buy_quote", "Ignore"
+            ]
+            df = pd.DataFrame([vela_actual], columns=columnas)
+            df = df.astype({"Open": float, "High": float, "Low": float, "Close": float, "Volume": float})
+            df["timestamp"] = pd.to_datetime(df["timestamp"], unit='ms')
+            df["timestamp"] = df["timestamp"].dt.tz_localize("UTC").dt.tz_convert(tz_local)
+            df.set_index("timestamp", inplace=True)
+            return df.iloc[0]
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error de conexión: {e}")
+            print(f"🔁 Reintentando ({intento+1}/{max_reintentos}) en 10 segundos...")
+            time.sleep(10)
+
+    print("🛑 No fue posible obtener la vela tras varios intentos.")
+    return None
 
 def set_symbol(new_symbol):
     global SYMBOL, CSV_FILE
