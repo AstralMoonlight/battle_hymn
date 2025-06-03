@@ -21,6 +21,8 @@ Opcional: BB_Media (para comentarios sobre Bollinger).
 from __future__ import annotations
 
 import os
+# Evita el banner de bienvenida de pygame
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 from typing import Optional
 
 import pandas as pd
@@ -91,9 +93,13 @@ def evaluar_senal(df: pd.DataFrame, solo_tipo: bool = False) -> Optional[str]:
     bb_centro = curr.get("BB_Media")  # Puede no existir
 
     # ─── Umbral DI dinámico ──────────────────────────────────────────────────
-    di_gap_series = (df["+DI"] - df["-DI"]).abs()
-    dynamic_di = di_gap_series.tail(100).quantile(0.60)
-    diff_threshold = max(config.DIFERENCIA_DI, dynamic_di)
+    DI_WINDOW      = getattr(config, "DI_WINDOW", 100)       # velas a considerar
+    DI_PERCENTILE  = getattr(config, "DI_PERCENTILE", 0.60)  # 0–1
+
+    di_gap_series  = (df["+DI"] - df["-DI"]).abs()
+    dynamic_di     = di_gap_series.tail(DI_WINDOW).quantile(DI_PERCENTILE)
+    min_di = getattr(config, "DIFERENCIA_DI", 0)
+    diff_threshold = max(min_di, dynamic_di)
 
     # ─── Condiciones auxiliares ──────────────────────────────────────────────
     cross_up   = prev_fast <= prev_slow and sma_fast > sma_slow
@@ -144,5 +150,9 @@ def evaluar_senal(df: pd.DataFrame, solo_tipo: bool = False) -> Optional[str]:
 
     else:
         print(f"⚪ {config.SYMBOL} Sin señal clara, esperar confirmación.")
-
+        
+    if config.DEBUG_LEVEL >= 1:
+        print(f"ℹ️ DI_gap={di_gap_long:.2f}, threshold={diff_threshold:.2f}, "
+            f"ADX={adx:.2f}, RSI={rsi:.2f}")
+        
     return None

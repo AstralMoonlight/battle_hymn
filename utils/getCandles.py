@@ -7,17 +7,17 @@ import requests
 import pandas as pd
 import pytz
 from datetime import datetime
-from config import TIMEZONE
+from config import *
 
 tz_local = pytz.timezone(TIMEZONE)
 API_URL = "https://fapi.binance.com/fapi/v1/klines"
-MAX_LIMIT = 1000  # Binance no acepta más de 1000 por petición
+
 
 def obtener_klines_pandas(symbol: str, interval: str,
                           total: int = 1000, 
                           pause_ms: int = 500) -> pd.DataFrame:
     """
-    Descarga hasta 'total' velas de Binance en bloques de MAX_LIMIT (1000),
+    Descarga hasta 'total' velas de Binance en bloques de LIMIT_API (1000),
     concatenándolas en un DataFrame de pandas con zona horaria local.
 
     Parámetros:
@@ -35,7 +35,7 @@ def obtener_klines_pandas(symbol: str, interval: str,
     end_time = None  # timestamp en ms; si es None, Binance usa el "now"
 
     while fetched < total:
-        limit = min(MAX_LIMIT, total - fetched)
+        limit = min(LIMIT_API, total - fetched)
         params = {
             "symbol": symbol.upper(),
             "interval": interval,
