@@ -1,168 +1,148 @@
 # utils/estrategia.py
+"""Estrategia DI‑SMA v2
+----------------------
+Lógica de generación de señales LONG/SHORT basada en:
+- Cruce real entre SMA_CORTA y SMA_LARGA (no mera posición).
+- Diferencia dinámica entre +DI y ‑DI (percentil 60 de las últimas 100 velas).
+- ADX por encima de umbral *y* en pendiente ascendente.
+- RSI por encima/por debajo de RSI_CORTE y con pendiente coherente.
+
+Incluye:
+- Reproducción opcional de sonidos.
+- Posibilidad de retornar sólo el tipo de señal con ``solo_tipo=True``.
+- Impresión de mensajes amigables.
+
+Requisitos del ``DataFrame``:
+    RSI, +DI, -DI, ADX,
+    SMA{SMA_CORTA}, SMA{SMA_LARGA}, Close
+Opcional: BB_Media (para comentarios sobre Bollinger).
+"""
+
+from __future__ import annotations
 
 import os
+from typing import Optional
+
+import pandas as pd
 from pygame import mixer
+
 import config
 
-# Inicializa el reproductor una vez
-mixer.init()
+# ────────────────────────────────────────────────────────────────────────────────
+# Audio helpers
+# ────────────────────────────────────────────────────────────────────────────────
 
-# Rutas de sonido
+mixer.init()
 SONIDO_LONG = os.path.join("wav", "sound2.wav")
 SONIDO_SHORT = os.path.join("wav", "sound3.wav")
 
-
-def reproducir_sonido(ruta):
-    """
-    Reproduce un archivo de sonido si existe. 
-    """
+def _reproducir_sonido(ruta: str) -> None:
+    """Reproduce un archivo de sonido si existe y Pygame está operativo."""
     try:
         if os.path.exists(ruta):
             mixer.music.load(ruta)
             mixer.music.play()
         else:
             print(f"⚠️ Archivo de sonido no encontrado: {ruta}")
-    except Exception as e:
-        print(f"⚠️ Error al reproducir sonido: {e}")
+    except Exception as exc:  # pylint: disable=broad-except
+        print(f"⚠️ Error al reproducir sonido: {exc}")
 
+# ────────────────────────────────────────────────────────────────────────────────
+# Signal Engine
+# ────────────────────────────────────────────────────────────────────────────────
 
-def evaluar_senal(df, solo_tipo=False):
-    if df.empty:
+def evaluar_senal(df: pd.DataFrame, solo_tipo: bool = False) -> Optional[str]:
+    """Evalúa la última vela del *DataFrame* y determina si hay señal.
+
+    Parámetros
+    ----------
+    df : pd.DataFrame
+        Velas con indicadores calculados.
+    solo_tipo : bool, optional
+        Si *True*, devuelve «long», «short» o *None* sin imprimir ni reproducir
+        sonidos.  Por defecto *False*.
+    """
+    # ─── Validaciones básicas ────────────────────────────────────────────────
+    if df is None or len(df) < 3:
         return None
 
-    try:
-        fila = df.iloc[-1]
-        rsi = fila["RSI"]
-        plus_di = fila["+DI"]
-        minus_di = fila["-DI"]
-        adx = fila["ADX"]
-        # Ahora usamos config.SMA_CORTA y config.SMA_LARGA dinámicos
-        sma_fast = fila[f"SMA{config.SMA_CORTA}"]
-        sma_slow = fila[f"SMA{config.SMA_LARGA}"]
-        close = fila["Close"]
-        bb_centro = fila["BB_Media"]
-    except KeyError as e:
-        print(f"⚠️ Falta columna en df: {e}.")
+    # Columnas requeridas
+    required_cols = {"RSI", "+DI", "-DI", "ADX", "Close",
+                     f"SMA{config.SMA_CORTA}", f"SMA{config.SMA_LARGA}"}
+    missing = required_cols.difference(df.columns)
+    if missing:
+        print(f"⚠️ Falta(n) columna(s) en df: {sorted(missing)}")
         return None
 
-    # Y aquí referimos a config.RSI_CORTE, config.ADX_THRESHOLD, config.DIFERENCIA_DI…
+    # ─── Extracción de valores actuales y previos ────────────────────────────
+    curr = df.iloc[-1]
+    prev = df.iloc[-2]
+
+    rsi, prev_rsi = float(curr["RSI"]), float(prev["RSI"])
+    plus_di, minus_di = float(curr["+DI"]), float(curr["-DI"])
+    adx, prev_adx = float(curr["ADX"]), float(prev["ADX"])
+
+    sma_fast = float(curr[f"SMA{config.SMA_CORTA}"])
+    prev_fast = float(prev[f"SMA{config.SMA_CORTA}"])
+    sma_slow = float(curr[f"SMA{config.SMA_LARGA}"])
+    prev_slow = float(prev[f"SMA{config.SMA_LARGA}"])
+
+    close_price = float(curr["Close"])
+    bb_centro = curr.get("BB_Media")  # Puede no existir
+
+    # ─── Umbral DI dinámico ──────────────────────────────────────────────────
+    di_gap_series = (df["+DI"] - df["-DI"]).abs()
+    dynamic_di = di_gap_series.tail(100).quantile(0.60)
+    diff_threshold = max(config.DIFERENCIA_DI, dynamic_di)
+
+    # ─── Condiciones auxiliares ──────────────────────────────────────────────
+    cross_up   = prev_fast <= prev_slow and sma_fast > sma_slow
+    cross_down = prev_fast >= prev_slow and sma_fast < sma_slow
+
+    di_gap_long  = plus_di  - minus_di
+    di_gap_short = minus_di - plus_di
+
+    adx_ok = adx > config.ADX_THRESHOLD and adx > prev_adx
+    rsi_long_ok  = rsi > config.RSI_CORTE and (rsi - prev_rsi) > 0
+    rsi_short_ok = rsi < config.RSI_CORTE and (rsi - prev_rsi) < 0
+
+    # ─── Señales LONG / SHORT ────────────────────────────────────────────────
     long_cond = (
-        (rsi > config.RSI_CORTE) and
-        (plus_di > minus_di) and
-        ((plus_di - minus_di) >= config.DIFERENCIA_DI) and
-        (adx > config.ADX_THRESHOLD) and
-        (sma_fast > sma_slow)
-    )
-    short_cond = (
-        (rsi < config.RSI_CORTE) and
-        (minus_di > plus_di) and
-        ((minus_di - plus_di) >= config.DIFERENCIA_DI) and
-        (adx > config.ADX_THRESHOLD) and
-        (sma_fast < sma_slow)
+        cross_up and
+        di_gap_long >= diff_threshold and
+        adx_ok and
+        rsi_long_ok
     )
 
+    short_cond = (
+        cross_down and
+        di_gap_short >= diff_threshold and
+        adx_ok and
+        rsi_short_ok
+    )
+
+    # ─── Solo tipo ───────────────────────────────────────────────────────────
     if solo_tipo:
         if long_cond:
             return "long"
-        elif short_cond:
+        if short_cond:
             return "short"
-        else:
-            return None
+        return None
 
-    # Si no es solo_tipo, imprimimos y tocamos sonido:
+    # ─── Mensajes & sonido ───────────────────────────────────────────────────
     if long_cond:
-        extra = ""
-        if close < bb_centro:
-            extra = " (✅ Mejorado por precio < centro Bollinger)"
-        print(f"🟢 {config.SYMBOL} Señal LONG recomendada{extra}")
-        reproducir_sonido(SONIDO_LONG)
+        extra = (" (⛑ Rebote bajo BB_Media)" if bb_centro is not None and
+                  close_price < float(bb_centro) else "")
+        print(f"🟢 {config.SYMBOL} Señal LONG{extra}")
+        _reproducir_sonido(SONIDO_LONG)
 
     elif short_cond:
-        extra = ""
-        if close > bb_centro:
-            extra = " (✅ Mejorado por precio > centro Bollinger)"
-        print(f"🔴 {config.SYMBOL} Señal SHORT recomendada{extra}")
-        reproducir_sonido(SONIDO_SHORT)
+        extra = (" (⛑ Rebote sobre BB_Media)" if bb_centro is not None and
+                  close_price > float(bb_centro) else "")
+        print(f"🔴 {config.SYMBOL} Señal SHORT{extra}")
+        _reproducir_sonido(SONIDO_SHORT)
 
     else:
         print(f"⚪ {config.SYMBOL} Sin señal clara, esperar confirmación.")
-    """
-    Detección de señal con parámetros tomados de config.py:
-      - RSI_CORTE: valor de RSI por encima → LONG; por debajo → SHORT.
-      - DIFERENCIA_DI: diferencia mínima entre +DI y -DI para considerar fuerza.
-      - ADX_THRESHOLD: valor mínimo de ADX para validar tendencia.
-      - SMA_CORTA vs SMA_LARGA: cruces de medias para confirmar dirección.
 
-    df debe contener al menos las columnas: ["RSI", "+DI", "-DI", "ADX", 
-    f"SMA{SMA_CORTA}", f"SMA{SMA_LARGA}", "Close", "BB_Media"].
-
-    Parámetros:
-        df         (pd.DataFrame): Ventana histórica de velas con columnas de indicadores.
-        solo_tipo   (bool)        : Si True, retorna solo "long"/"short"/None.
-                                   Si False, imprime el mensaje y reproduce sonido.
-
-    Retorna:
-        str|None: "long", "short" o None.
-    """
-    # Asegurarse de que haya al menos 1 fila
-    if df.empty:
-        return None
-
-    # Tomar la última fila de indicadores
-    try:
-        fila = df.iloc[-1]
-        rsi = fila["RSI"]
-        plus_di = fila["+DI"]
-        minus_di = fila["-DI"]
-        adx = fila["ADX"]
-        sma_fast = fila[f"SMA{SMA_CORTA}"]
-        sma_slow = fila[f"SMA{SMA_LARGA}"]
-        close = fila["Close"]
-        bb_centro = fila["BB_Media"]
-    except KeyError as e:
-        print(f"⚠️ Falta columna en df: {e}. Asegúrate de calcular todos los indicadores.")
-        return None
-
-    # Condición LONG
-    long_cond = (
-        (rsi > RSI_CORTE) and
-        (plus_di > minus_di) and
-        ((plus_di - minus_di) >= DIFERENCIA_DI) and
-        (adx > ADX_THRESHOLD) and
-        (sma_fast > sma_slow)
-    )
-
-    # Condición SHORT
-    short_cond = (
-        (rsi < RSI_CORTE) and
-        (minus_di > plus_di) and
-        ((minus_di - plus_di) >= DIFERENCIA_DI) and
-        (adx > ADX_THRESHOLD) and
-        (sma_fast < sma_slow)
-    )
-
-    if solo_tipo:
-        if long_cond:
-            return "long"
-        elif short_cond:
-            return "short"
-        else:
-            return None
-
-    # Si no es solo_tipo, imprimimos y reproducimos sonido
-    if long_cond:
-        extra = ""
-        if close < bb_centro:
-            extra = " (✅ Mejorado por precio < centro Bollinger)"
-        print(f"🟢 {SYMBOL} Señal LONG recomendada{extra}")
-        reproducir_sonido(SONIDO_LONG)
-
-    elif short_cond:
-        extra = ""
-        if close > bb_centro:
-            extra = " (✅ Mejorado por precio > centro Bollinger)"
-        print(f"🔴 {SYMBOL} Señal SHORT recomendada{extra}")
-        reproducir_sonido(SONIDO_SHORT)
-
-    else:
-        print(f"⚪ {SYMBOL} Sin señal clara, esperar confirmación.")
+    return None
