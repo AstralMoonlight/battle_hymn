@@ -26,7 +26,7 @@ import pytz
 from datetime import datetime
 
 # Importar variables de configuración (sirven como valores por defecto)
-from config import SYMBOL, BASE_INTERVAL_STR, LIMIT, CSV_FILE, TIMEZONE
+from config import SYMBOL, BASE_INTERVAL_STR, LIMIT_API, CSV_FILE, TIMEZONE
 
 # Preparar la zona horaria local
 tz_local = pytz.timezone(TIMEZONE)
@@ -57,7 +57,7 @@ def guardar_datos_si_existen(df: pd.DataFrame, ruta: str) -> bool:
     return True
 
 
-def obtener_klines(symbol: str = SYMBOL, interval: str = BASE_INTERVAL_STR, limit: int = LIMIT) -> pd.DataFrame:
+def obtener_klines(symbol: str = SYMBOL, interval: str = BASE_INTERVAL_STR, limit: int = LIMIT_API) -> pd.DataFrame:
     """
     Descarga velas (klines) de Binance Futures para el símbolo y intervalo especificados.
 
@@ -197,7 +197,7 @@ def actualizar_datos() -> pd.DataFrame:
     return df
 
 
-def obtener_vela_en_formacion() -> pd.Series or None:
+def obtener_vela_en_formacion() -> pd.Series or None: # type: ignore
     """
     Solicita la vela en formación (la última no cerrada completamente).
     Realiza hasta 5 reintentos si hay error de conexión.
